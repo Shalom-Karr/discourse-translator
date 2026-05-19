@@ -58,12 +58,6 @@ jobs:
         with:
           path: discourse/plugins/discourse-translator
 
-      - name: Checkout discourse-ai (required plugin)
-        uses: actions/checkout@v4
-        with:
-          repository: discourse/discourse-ai
-          path: discourse/plugins/discourse-ai
-
       - name: Set up Ruby 3.4
         uses: ruby/setup-ruby@v1
         with:
@@ -94,10 +88,6 @@ jobs:
 
       - name: Enable Corepack
         run: corepack enable
-
-      - name: Relax discourse-ai pnpm engine pin
-        run: |
-          node -e "const fs=require('fs'),f='discourse/plugins/discourse-ai/package.json',p=JSON.parse(fs.readFileSync(f));delete p.engines;fs.writeFileSync(f,JSON.stringify(p,null,2))"
 
       - name: Install JS dependencies
         working-directory: discourse
