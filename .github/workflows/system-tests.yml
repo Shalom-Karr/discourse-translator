@@ -95,6 +95,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Relax discourse-ai pnpm engine pin
+        run: |
+          node -e "const fs=require('fs'),f='discourse/plugins/discourse-ai/package.json',p=JSON.parse(fs.readFileSync(f));delete p.engines;fs.writeFileSync(f,JSON.stringify(p,null,2))"
+
       - name: Install JS dependencies
         working-directory: discourse
         run: pnpm install
