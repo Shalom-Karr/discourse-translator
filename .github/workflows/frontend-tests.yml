@@ -1,4 +1,4 @@
-name: System Tests
+name: Frontend System Tests
 
 on:
   push:
@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rspec_system:
+  system:
     name: RSpec (spec/system)
     runs-on: ubuntu-latest
 
@@ -44,7 +44,8 @@ jobs:
       DISCOURSE_DB_HOST: 127.0.0.1
       DISCOURSE_DB_USERNAME: discourse
       DISCOURSE_DB_PASSWORD: discourse
-      CAPYBARA_DEFAULT_MAX_WAIT_TIME: 10
+      CAPYBARA_DEFAULT_MAX_WAIT_TIME: "10"
+      APPIMAGE_EXTRACT_AND_RUN: "1"
 
     steps:
       - name: Checkout Discourse
@@ -69,11 +70,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y libpq-dev libssl-dev imagemagick
 
-      - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-          install-chromedriver: true
+      - name: Install ImageMagick 7 (provides the `magick` binary)
+        run: |
+          sudo wget -q https://imagemagick.org/archive/binaries/magick -O /usr/local/bin/magick
+          sudo chmod +x /usr/local/bin/magick
+          magick -version
 
       - name: Start Redis
         run: |
@@ -86,8 +87,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Install JS dependencies
         working-directory: discourse
@@ -97,26 +98,41 @@ jobs:
         working-directory: discourse
         run: bundle install --jobs 4 --retry 3
 
+      - name: Install Playwright browser
+        working-directory: discourse
+        run: |
+          PW_VERSION=$(grep -oE "playwright-ruby-client \([0-9]+\.[0-9]+\.[0-9]+" Gemfile.lock | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+          echo "Installing Playwright (matching playwright-ruby-client ${PW_VERSION})"
+          npx --yes "playwright@${PW_VERSION}" install --with-deps chromium
+
       - name: Set up database
         working-directory: discourse
         run: bundle exec rake db:create db:migrate
 
-      - name: Build frontend assets
+      - name: Build Ember assets
         working-directory: discourse
-        run: bin/ember-cli --build
+        env:
+          EMBER_ENV: development
+        run: |
+          if [ -f script/assemble_ember_build.rb ]; then
+            export DISCOURSE_DOWNLOAD_PRE_BUILT_ASSETS=$(bin/rails runner 'puts(Discourse.has_needed_version?(Discourse::VERSION::STRING, "2026.3.0-latest") ? 1 : 0)')
+            script/assemble_ember_build.rb
+          else
+            bin/ember-cli --build
+          fi
 
-      - name: Run system specs
+      - name: Run plugin system specs
         working-directory: discourse
         run: |
           bundle exec rspec \
             plugins/discourse-translator/spec/system \
             --format documentation
 
-      - name: Upload failure screenshots
-        if: failure()
+      - name: Upload UI screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: system-test-screenshots
+          name: ui-screenshots
           path: discourse/tmp/capybara/
-          if-no-files-found: ignore
-          retention-days: 7
+          if-no-files-found: warn
+          retention-days: 14
