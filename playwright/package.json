@@ -1,0 +1,12 @@
+{
+  "name": "discourse-translator-playwright",
+  "private": true,
+  "description": "Playwright screenshot suite for the discourse-translator plugin",
+  "scripts": {
+    "test": "playwright test",
+    "install-browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
